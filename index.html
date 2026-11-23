@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StudyPlanner Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">✦</div>
+      <div><strong>Study<span>Planner</span></strong><small>Plan · Study · Achieve</small></div>
+    </div>
+    <nav>
+      <a class="nav-link active" href="{{ url_for('dashboard') }}">⌂ <span>Dashboard</span></a>
+      <a class="nav-link" href="#my-tasks">☑ <span>My Tasks</span></a>
+      <a class="nav-link" href="#calendar">▦ <span>Study Schedule</span></a>
+      <a class="nav-link" href="#subjects">▤ <span>Subjects</span></a>
+      <a class="nav-link" href="#progress">▥ <span>Statistics</span></a>
+      <a class="nav-link" href="#weak-topics">⚠ <span>Weak Topics</span><b class="new">New</b></a>
+      <a class="nav-link" href="#smart-backlog">✧ <span>Smart Backlog</span><b class="new purple">New</b></a>
+    </nav>
+    <div class="sidebar-quote">“Small steps every day<br>lead to big results.”<div class="mountain">⌁</div></div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <label class="search">⌕ <input id="searchInput" type="search" placeholder="Search tasks, subjects..."></label>
+      <div class="profile"><span class="bell">♧</span><span class="avatar">👤</span><strong>Student</strong></div>
+    </header>
+
+    <section class="welcome">
+      <div><h1>Good Morning, Student! <span>☀️</span></h1><p>Stay focused, stay consistent, achieve your goals.</p></div>
+      <div class="date-box">▦ &nbsp; {{ today.strftime('%d %B %Y') }}<small>Today</small></div>
+    </section>
+
+    <div class="dashboard-grid">
+      <section class="left-column">
+        <div class="stats-grid">
+          <article class="stat-card"><div class="stat-icon blue">▣</div><div><span>Total Tasks</span><strong>{{ total }}</strong><small>All your tasks</small></div></article>
+          <article class="stat-card"><div class="stat-icon green">✓</div><div><span>Completed</span><strong>{{ completed }}</strong><small>Keep it up!</small></div></article>
+          <article class="stat-card"><div class="stat-icon orange">◷</div><div><span>Pending</span><strong>{{ pending }}</strong><small>One step at a time</small></div></article>
+          <article class="stat-card"><div class="stat-icon violet">◎</div><div><span>Study Progress</span><strong>{{ progress }}%</strong><div class="progress-track"><i style="width:{{ progress }}%"></i></div></div></article>
+        </div>
+
+        <div class="two-col">
+          <section class="panel" id="calendar">
+            <div class="panel-heading"><h2>▦ &nbsp; Calendar</h2><span>{{ today.strftime('%B %Y') }}</span></div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+            <p class="muted small">Use task deadlines to plan your study schedule.</p>
+          </section>
+
+          <section class="panel" id="add-task">
+            <div class="panel-heading"><h2><span class="plus">＋</span> Add New Task</h2></div>
+            <form action="{{ url_for('add_task') }}" method="post" class="task-form">
+              <label>Task Name *</label><input name="title" required placeholder="e.g. Revise Data Structures">
+              <label>Description</label><textarea name="description" rows="2" placeholder="What do you need to study?"></textarea>
+              <div class="form-row">
+                <div><label>Subject</label><select name="subject_id"><option value="">Other / no subject</option>{% for s in all_subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select></div>
+                <div><label>Date</label><input type="date" name="deadline"></div>
+              </div>
+              <label>Priority</label><select name="priority"><option>High</option><option selected>Medium</option><option>Low</option></select>
+              <button class="primary-btn" type="submit">＋ &nbsp; Add Task</button>
+            </form>
+          </section>
+        </div>
+
+        <section class="panel" id="subjects">
+          <div class="panel-heading"><h2>▥ &nbsp; Subject Progress</h2><a href="#progress">View Details →</a></div>
+          <div class="subject-list">
+          {% for s in subjects %}
+            {% set pct = ((s.completed or 0) / s.total * 100)|round|int if s.total else 0 %}
+            <div class="subject-row">
+              <div class="subject-dot" style="background:{{ s.color }}"></div>
+              <div class="subject-content"><div class="subject-top"><strong>{{ s.name }}</strong><span>{{ pct }}%</span></div>
+                <div class="progress-track"><i style="width:{{ pct }}%;background:{{ s.color }}"></i></div>
+                <small>{{ s.completed or 0 }}/{{ s.total }} tasks completed</small>
+              </div>
+            </div>
+          {% endfor %}
+          </div>
+        </section>
+        <div class="quote-card">💡 &nbsp; “Discipline is the bridge between your goals and your achievements.” <span>📚</span></div>
+      </section>
+
+      <section class="middle-column panel tasks-panel" id="my-tasks">
+        <div class="panel-heading"><h2>☑ &nbsp; My Tasks</h2></div>
+        <div class="filters">
+          <a class="{{ 'selected' if filter_status=='All' else '' }}" href="{{ url_for('dashboard', status='All') }}">All</a>
+          <a class="{{ 'selected' if filter_status=='Pending' else '' }}" href="{{ url_for('dashboard', status='Pending') }}">Pending</a>
+          <a class="{{ 'selected' if filter_status=='Completed' else '' }}" href="{{ url_for('dashboard', status='Completed') }}">Completed</a>
+        </div>
+        <div id="taskList">
+        {% for t in tasks %}
+          <article class="task-item" data-search="{{ (t.title ~ ' ' ~ (t.subject_name or '') ~ ' ' ~ t.priority)|lower }}">
+            <form action="{{ url_for('toggle_task', task_id=t.id) }}" method="post">
+              <button class="check {{ 'checked' if t.status=='Completed' else '' }}" title="Toggle completed" type="submit">{{ '✓' if t.status=='Completed' else '' }}</button>
+            </form>
+            <div class="task-info">
+              <strong class="{{ 'done' if t.status=='Completed' else '' }}">{{ t.title }}</strong>
+              <div class="task-meta"><span class="subject-pill" style="color:{{ t.subject_color or '#64748b' }}">{{ t.subject_name or 'Other' }}</span><span>▦ {{ t.deadline or 'No deadline' }}</span></div>
+              {% if t.description %}<small class="description">{{ t.description }}</small>{% endif %}
+            </div>
+            <span class="priority {{ t.priority|lower }}">{{ t.priority }}</span>
+            <details class="edit-menu"><summary title="Edit task">✎</summary>
+              <form action="{{ url_for('edit_task', task_id=t.id) }}" method="post" class="edit-form">
+                <label>Title</label><input name="title" value="{{ t.title }}" required>
+                <label>Description</label><textarea name="description">{{ t.description }}</textarea>
+                <label>Subject</label><select name="subject_id"><option value="">Other</option>{% for s in all_subjects %}<option value="{{ s.id }}" {{ 'selected' if s.id==t.subject_id else '' }}>{{ s.name }}</option>{% endfor %}</select>
+                <label>Deadline</label><input type="date" name="deadline" value="{{ t.deadline or '' }}">
+                <label>Priority</label><select name="priority">{% for p in ['High','Medium','Low'] %}<option {{ 'selected' if t.priority==p else '' }}>{{ p }}</option>{% endfor %}</select>
+                <button class="primary-btn" type="submit">Save changes</button>
+              </form>
+            </details>
+            <form action="{{ url_for('delete_task', task_id=t.id) }}" method="post" onsubmit="return confirm('Delete this task?')"><button class="icon-btn delete-btn" title="Delete task">▤</button></form>
+          </article>
+        {% else %}
+          <p class="empty">No tasks found. Add a task to get started.</p>
+        {% endfor %}
+        </div>
+      </section>
+
+      <aside class="right-column">
+        <section class="panel weak-panel" id="weak-topics">
+          <div class="panel-heading"><h2>⚠ Weak Topic Detection</h2><span class="tiny-link">View All →</span></div>
+          <p class="muted">Based on pending tasks by subject. This is a simple rule-based indicator, not an AI assessment.</p>
+          {% for s in weak_topics %}
+            <div class="weak-row"><div class="subject-dot" style="background:{{ s.color }}"></div><div class="weak-info"><strong>{{ s.name }}</strong><small>{{ s.pending_count }} pending task(s)</small><div class="progress-track"><i style="width:{{ [s.pending_count*25,100]|min }}%;background:{{ s.color }}"></i></div></div><span class="weak-count">{{ s.pending_count }}</span></div>
+          {% endfor %}
+        </section>
+
+        <section class="panel backlog-panel" id="smart-backlog">
+          <div class="panel-heading"><h2>✧ Smart Backlog</h2><span class="tiny-link">Priority order</span></div>
+          <p class="muted">Suggested order based on priority and deadline.</p>
+          {% for t in tasks if t.status=='Pending' %}
+          <div class="backlog-item"><span class="rank">{{ loop.index }}</span><div class="backlog-info"><strong>{{ t.title }}</strong><small>{{ t.subject_name or 'Other' }} · {{ t.deadline or 'No deadline' }}</small><span class="priority {{ t.priority|lower }}">{{ t.priority }}</span></div><form action="{{ url_for('toggle_task', task_id=t.id) }}" method="post"><button class="study-btn" type="submit">Study Now</button></form></div>
+          {% else %}
+          <p class="empty">No pending tasks. Great work!</p>
+          {% endfor %}
+          <div class="suggestion">✦ <strong>Smart suggestion</strong><br><small>Complete high-priority tasks first, then work through the remaining tasks.</small></div>
+        </section>
+      </aside>
+    </div>
+    <footer>StudyPlanner · Build consistent habits, one task at a time.</footer>
+  </main>
+</div>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
